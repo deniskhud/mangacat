@@ -1,71 +1,6 @@
-#include "backend.hpp"
+/*#include "backend.hpp"
 #include <iostream>
 #include "../stb_image.h"
-
-std::shared_ptr<ImageData> load_image(const fs::path& p) {
-    auto img = std::make_shared<ImageData>();
-    img->path = p.string();
-
-    int w, h, ch;
-    uint8_t* pixels = stbi_load(p.c_str(), &w, &h, &ch, 3);
-    if (pixels) {
-        img->layout = ImageLayout::compute(pixels, w, h);
-        // если хочешь хранить сырые байты тоже:
-        //img->pixels.assign(pixels, pixels + w * h * 3);
-
-        std::string encoded = Backend::base64_encode(img->layout.resized.data(), img->layout.out_w * img->layout.out_h * 3);
-        const size_t CHUNK = 4096;
-        size_t total = encoded.size();
-        size_t offset = 0;
-
-        while (offset < total) {
-            size_t chunk_size = std::min(CHUNK, total - offset);
-            int more = (offset + chunk_size < total) ? 1 : 0;
-
-            Chunk chunk;
-
-            if (offset == 0) {
-                //std::cerr << "w = " << img->layout.out_w << ", h = " << img->layout.out_h <<  std::endl;
-                chunk.prefix = "\033_Ga=T,f=24,s=" + std::to_string(img->layout.out_w) +
-               ",v=" + std::to_string(img->layout.out_h) +
-               ",x=0,y=0," +
-               "m=" + std::to_string(more) + ";";
-            } else {
-                chunk.prefix = "\033_Gm=" + std::to_string(more) + ";";
-            }
-
-            chunk.data.assign(encoded.data() + offset, chunk_size);
-
-            img->chunks.push_back(std::move(chunk));
-
-            offset += chunk_size;
-        }
-
-        stbi_image_free(pixels);
-        img->loaded = true;
-    }
-
-
-
-    std::cerr << "Loaded image " << p.c_str() << std::endl;
-    return img;
-}
-
-
-std::string Backend::base64_encode(const uint8_t* data, size_t len) {
-    std::string out;
-    out.reserve(((len + 2) / 3) * 4);
-    for (size_t i = 0; i < len; i += 3) {
-        uint32_t v = data[i] << 16;
-        if (i + 1 < len) v |= data[i+1] << 8;
-        if (i + 2 < len) v |= data[i+2];
-        out += b64[(v >> 18) & 63];
-        out += b64[(v >> 12) & 63];
-        out += (i + 1 < len) ? b64[(v >>  6) & 63] : '=';
-        out += (i + 2 < len) ? b64[ v        & 63] : '=';
-    }
-    return out;
-}
 
 Backend::DirectoryLoader::DirectoryLoader(const fs::path& cpath) {
     current_path = cpath;
@@ -144,3 +79,74 @@ void Backend::DirectoryLoader::debug_m() {
     std::cerr << "---------------------" << std::endl;
 
 }
+
+
+
+/*** image loader **#1#
+Backend::ImageLoader::ImageLoader(const std::string_view &path) {
+
+}
+
+std::string Backend::ImageLoader::base64_encode(const uint8_t* data, size_t len) {
+    std::string out;
+    out.reserve(((len + 2) / 3) * 4);
+    for (size_t i = 0; i < len; i += 3) {
+        uint32_t v = data[i] << 16;
+        if (i + 1 < len) v |= data[i+1] << 8;
+        if (i + 2 < len) v |= data[i+2];
+        out += b64[(v >> 18) & 63];
+        out += b64[(v >> 12) & 63];
+        out += (i + 1 < len) ? b64[(v >>  6) & 63] : '=';
+        out += (i + 2 < len) ? b64[ v        & 63] : '=';
+    }
+    return out;
+}
+
+void Backend::ImageLoader::load_image(const fs::path& p) {
+    auto img = std::make_shared<ImageData>();
+    img->path = p.string();
+
+    int w, h, ch;
+    uint8_t* pixels = stbi_load(p.c_str(), &w, &h, &ch, 3);
+    if (pixels) {
+        img->layout = ImageLayout::compute(pixels, w, h);
+        // если хочешь хранить сырые байты тоже:
+        //img->pixels.assign(pixels, pixels + w * h * 3);
+
+        std::string encoded = base64_encode(img->layout.resized.data(), img->layout.out_w * img->layout.out_h * 3);
+        const size_t CHUNK = 4096;
+        size_t total = encoded.size();
+        size_t offset = 0;
+
+        while (offset < total) {
+            size_t chunk_size = std::min(CHUNK, total - offset);
+            int more = (offset + chunk_size < total) ? 1 : 0;
+
+            Chunk chunk;
+
+            if (offset == 0) {
+                //std::cerr << "w = " << img->layout.out_w << ", h = " << img->layout.out_h <<  std::endl;
+                chunk.prefix = "\033_Ga=T,f=24,s=" + std::to_string(img->layout.out_w) +
+               ",v=" + std::to_string(img->layout.out_h) +
+               ",x=0,y=0," +
+               "m=" + std::to_string(more) + ";";
+            } else {
+                chunk.prefix = "\033_Gm=" + std::to_string(more) + ";";
+            }
+
+            chunk.data.assign(encoded.data() + offset, chunk_size);
+
+            img->chunks.push_back(std::move(chunk));
+
+            offset += chunk_size;
+        }
+
+        stbi_image_free(pixels);
+        img->loaded = true;
+    }
+
+
+
+    std::cerr << "Loaded image " << p.c_str() << std::endl;
+    image = img;
+}*/

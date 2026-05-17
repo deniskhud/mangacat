@@ -21,15 +21,20 @@ add_executable(cli_manga_reader src/main.cpp
         src/backend/ImageData.hpp
         src/renderer/KittyRenderer.hpp
         src/backend/ImageData.cpp
-        src/stb.cpp)
+        src/stb.cpp
+        src/backend/ImageLoader.hpp
+        src/backend/ImageCache.hpp
+        src/backend/Navigator.hpp
+        src/backend/ImageLoader.cpp
+        src/backend/DirectoryScanner.hpp
+        src/backend/ViewerApp.hpp
+        src/backend/ViewerApp.cpp)
 
 target_include_directories(cli_manga_reader PRIVATE
         include
-
 )
 
 target_link_libraries(cli_manga_reader
-
 )
 
 

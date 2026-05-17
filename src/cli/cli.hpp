@@ -1,54 +1,81 @@
-#ifndef CLI_HPP
-#define CLI_HPP
+#pragma once
+#include <string>
 #include <termios.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 
 namespace Cli {
 
-    struct TermSize {
-        unsigned int cols, rows, pixel_height, pixel_width;
-    };
-    class Terminal {
-    public:
-        Terminal();
+struct TermSize {
+    unsigned int cols, rows, pixel_height, pixel_width;
+};
 
-        ~Terminal() {
-            disable_raw_mode();
-            write(STDOUT_FILENO, "\033[?1049l", 8);
-        }
-    private:
-        TermSize size{};
-        struct termios old_termios{};
-
-        /** enable raw terminal mode
-         */
-        void enable_raw_mode();
-        void disable_raw_mode();
-
-        void refresh_size();
-
-
-        void hide_cursor() { write(STDOUT_FILENO, "\033[?25l", 6); }
-        void show_cursor() { write(STDOUT_FILENO, "\033[?25h", 6); }
-        void clear()       { write(STDOUT_FILENO, "\033[2J\033[H", 7); }
-
-    };
-
-    [[nodiscard]] inline TermSize get_terminal_size() {
-        struct winsize ws;
-        ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
-        return { ws.ws_col, ws.ws_row, ws.ws_ypixel, ws.ws_xpixel };
-    }
-
-    inline auto init() -> Terminal {
-        return {};
-    }
-    class Bar {
-    private:
-
-    public:
-    };
+// Специальные клавиши — выше ASCII чтобы не пересекаться
+namespace Key {
+    constexpr int ARROW_LEFT  = 1000;
+    constexpr int ARROW_RIGHT = 1001;
+    constexpr int ARROW_UP    = 1002;
+    constexpr int ARROW_DOWN  = 1003;
+    constexpr int PAGE_UP     = 1004;
+    constexpr int PAGE_DOWN   = 1005;
+    constexpr int HOME        = 1006;
+    constexpr int END         = 1007;
+    constexpr int ESC         = 27;
+    constexpr int TAB         = 9;
 }
 
-#endif //CLI_HPP
+class Terminal {
+public:
+    Terminal();
+
+    ~Terminal() {
+        show_cursor();
+        disable_raw_mode();
+        write(STDOUT_FILENO, "\033[?1049l", 8);  // restore screen
+    }
+
+    // ── Ввод ──────────────────────────────────────────────────────────
+    // Блокирует до нажатия клавиши.
+    // Возвращает ASCII-код или Cli::Key::* для спецклавиш.
+    int read_key() const;
+
+    // ── Вывод ─────────────────────────────────────────────────────────
+    void draw_at(unsigned int col, unsigned int row, const std::string& text) const {
+        std::string cmd = "\033[" + std::to_string(row) + ";"
+                        + std::to_string(col) + "H" + text;
+        write(STDOUT_FILENO, cmd.c_str(), cmd.size());
+    }
+
+    void clear()       { write(STDOUT_FILENO, "\033[2J\033[H", 8); }
+    void hide_cursor() const { write(STDOUT_FILENO, "\033[?25l", 6); }
+    void show_cursor() const { write(STDOUT_FILENO, "\033[?25h", 6); }
+
+    // ── Размер ────────────────────────────────────────────────────────
+    void refresh_size() {
+        size = query_size();
+        center_row = (size.rows / 2) + 1;
+        center_col = (size.cols / 2) + 1;
+    }
+
+    [[nodiscard]] TermSize get_terminal_size() const { return size; }
+
+private:
+
+    static TermSize query_size() {
+        struct winsize w;
+        ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+        return { w.ws_col, w.ws_row, w.ws_ypixel, w.ws_xpixel };
+    }
+
+    void enable_raw_mode();
+
+    void disable_raw_mode() {
+        tcsetattr(STDIN_FILENO, TCSANOW, &old_termios_);
+    }
+
+    TermSize size{};
+    unsigned int center_col = 0;
+    unsigned int center_row = 0;
+    struct termios old_termios_{};
+};
+} // namespace Cli

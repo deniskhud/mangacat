@@ -2,7 +2,6 @@
 #define BACKEND_HPP
 #include <filesystem>
 #include <vector>
-
 #include <deque>
 namespace fs = std::filesystem;
 /*TODO поддержка смены директории, маленький файловый менеджер(передвигаться по директориям)*/
@@ -23,10 +22,8 @@ namespace Backend {
          *
          *
     */
-    std::string base64_encode(const uint8_t* data, size_t len);
-    static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    /**
-     * класс, хранит в себе пути к картинкам текущей директории
+    /** навигатор по директориям
+     * класс, с которым мы сможем переходить по директориям, текущую он отдаст на навигацию
      */
     class DirectoryLoader {
     private:
@@ -49,8 +46,8 @@ namespace Backend {
             current_page--;
         }
 
-        [[nodiscard]]ImageData get_image_data() {
-            return *deque_[2];
+        [[nodiscard]]std::shared_ptr<ImageData> get_image_data() {
+            return deque_[2];
         }
         [[nodiscard]] std::string get_page_by_index(size_t index) const;
 
@@ -59,7 +56,25 @@ namespace Backend {
 
         DirectoryLoader(const fs::path& cpath);
     };
-}
 
+    class DirectoryNavigator {
+    private:
+
+    public:
+    };
+
+    //загружаем картинку
+    /*class ImageLoader {
+    private:
+        std::string base64_encode(const uint8_t* data, size_t len);
+        const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        std::shared_ptr<ImageData> image;
+        void load_image(const fs::path& p);
+    public:
+        ImageLoader(const std::string_view& path);
+        std::shared_ptr<ImageData> get_image_data();
+    };*/
+
+}
 
 #endif //BACKEND_HPP
