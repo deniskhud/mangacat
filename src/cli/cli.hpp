@@ -45,37 +45,42 @@ public:
                         + std::to_string(col) + "H" + text;
         write(STDOUT_FILENO, cmd.c_str(), cmd.size());
     }
-
+    /*completely clear the window */
     void clear()       { write(STDOUT_FILENO, "\033[2J\033[H", 8); }
+    /*clear the window at certain coordinates */
+    void clear_at(unsigned int col, unsigned int row, unsigned int width,  unsigned int height) const;
     void hide_cursor() const { write(STDOUT_FILENO, "\033[?25l", 6); }
     void show_cursor() const { write(STDOUT_FILENO, "\033[?25h", 6); }
 
-    // ── Размер ────────────────────────────────────────────────────────
+    /* refresh size terminal */
     void refresh_size() {
         size = query_size();
         center_row = (size.rows / 2) + 1;
         center_col = (size.cols / 2) + 1;
     }
-
+    /* return current terminal size */
     [[nodiscard]] TermSize get_terminal_size() const { return size; }
 
 private:
-
+    /* requests the size of the terminal, for ex when changing the size */
     static TermSize query_size() {
         struct winsize w;
         ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
         return { w.ws_col, w.ws_row, w.ws_ypixel, w.ws_xpixel };
     }
-
+    /* enable the raw terminal mode */
     void enable_raw_mode();
 
+    /* disable the raw mode, in destructor */
     void disable_raw_mode() {
         tcsetattr(STDIN_FILENO, TCSANOW, &old_termios_);
     }
 
+    /* terminal size, pixel height/width */
     TermSize size{};
     unsigned int center_col = 0;
     unsigned int center_row = 0;
+    /* default terminal settings */
     struct termios old_termios_{};
 };
 } // namespace Cli

@@ -56,25 +56,6 @@ namespace Backend {
 
         DirectoryLoader(const fs::path& cpath);
     };
-
-    class DirectoryNavigator {
-    private:
-
-    public:
-    };
-
-    //загружаем картинку
-    /*class ImageLoader {
-    private:
-        std::string base64_encode(const uint8_t* data, size_t len);
-        const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        std::shared_ptr<ImageData> image;
-        void load_image(const fs::path& p);
-    public:
-        ImageLoader(const std::string_view& path);
-        std::shared_ptr<ImageData> get_image_data();
-    };*/
-
 }
 
 #endif //BACKEND_HPP

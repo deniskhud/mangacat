@@ -1,5 +1,6 @@
 #include "renderer.hpp"
 
+#include <iostream>
 Renderer::Image::Image(const Cli::Terminal& term) : term_(term){
     termSize = term.get_terminal_size();
     center_row = (termSize.rows / 2) + 1;
@@ -11,7 +12,7 @@ void Renderer::Image::render(const std::shared_ptr<ImageData>& img) {
         return;// или нарисовать "Loading..."
     }
     if (needs_clear(img->layout)) {
-        term_.clear();
+        term_.clear_at(last_x_, last_y_, last_w_, last_h_);
     }
 
     set_cursor_center(img);
@@ -24,7 +25,8 @@ void Renderer::Image::render(const std::shared_ptr<ImageData>& img) {
     fflush(stdout);
     last_w_ = img->layout.out_w;
     last_h_ = img->layout.out_h;
-
+    last_x_ = img->layout.x;
+    last_y_ = img->layout.y;
 }
 
 void Renderer::Image::render_loading() {

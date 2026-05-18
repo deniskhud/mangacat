@@ -21,7 +21,6 @@ namespace Backend {
  *   scanner.rescan();                      // перечитать с диска
  *   scanner.change("/other/dir");          // сменить директорию
  */
-
 class DirectoryScanner {
 public:
     // Поддерживаемые расширения (регистронезависимо через lowercase)
@@ -38,19 +37,17 @@ public:
         if (!fs::exists(path) || !fs::is_directory(path))
             throw std::runtime_error("Not a directory: " + path.string());
         current_path_ = path;
-        rescan();
+        scan_directory();
     }
 
     // Перечитать текущую директорию с диска
-    void rescan() {
+    void scan_directory() {
         pages_.clear();
-
         for (const auto& entry : fs::directory_iterator(current_path_)) {
             if (!entry.is_regular_file()) continue;
             if (is_supported(entry.path()))
                 pages_.push_back(entry.path());
         }
-
         sort();
     }
     /** getters **/
@@ -71,8 +68,6 @@ private:
 
     void sort() {
         std::sort(pages_.begin(), pages_.end(), [](const fs::path& a, const fs::path& b) {
-            // Пробуем числовую сортировку (1.png, 2.png, 10.png ...)
-            // При ошибке (нечисловые имена) падаем на лексикографическую
             try {
                 return std::stoi(a.stem().string()) < std::stoi(b.stem().string());
             } catch (...) {
@@ -80,8 +75,9 @@ private:
             }
         });
     }
-
-    fs::path              current_path_;
+    /* full directory path */
+    fs::path current_path_;
+    /* array of pictures */
     std::vector<fs::path> pages_;
 };
 } // namespace Backend

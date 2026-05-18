@@ -50,7 +50,7 @@ public:
         lru_.clear();
     }
 
-    size_t size()     const { return map_.size(); }
+    size_t size() const { return map_.size(); }
     size_t capacity() const { return max_size_; }
 
 private:
@@ -86,10 +86,10 @@ private:
         lru_.pop_back();
     }
 
-    mutable std::mutex                         mutex_;
-    size_t                                     max_size_;
-    std::unordered_map<std::string, Entry>     map_;
-    std::list<std::string>                     lru_;
+    mutable std::mutex mutex_;
+    size_t max_size_;
+    std::unordered_map<std::string, Entry> map_;
+    std::list<std::string> lru_;
 };
 
 } // namespace Backend

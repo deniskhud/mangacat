@@ -3,12 +3,7 @@
 #include "../stb_image_resize2.h"
 #include <algorithm>
 
-ImageLayout ImageLayout::compute(const uint8_t*       pixels,
-                                 int                  img_w,
-                                 int                  img_h,
-                                 const Cli::TermSize& term,
-                                 int                  reserved_rows)
-{
+ImageLayout ImageLayout::compute(const uint8_t* pixels, int img_w, int img_h,const Cli::TermSize& term,int reserved_rows){
     ImageLayout layout;
 
     if (term.rows == 0 || term.cols == 0 ||

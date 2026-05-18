@@ -25,8 +25,8 @@ struct Pos {
 namespace Renderer {
     class Image {
     private:
-        int last_w_ = 0;
-        int last_h_  = 0;
+        int last_w_ = 0, last_h_ = 0;
+        int last_x_ = 0, last_y_ = 0;
 
         bool needs_clear(const ImageLayout& layout) const {
             // Первый кадр — всегда clear
