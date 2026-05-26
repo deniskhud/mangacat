@@ -3,7 +3,7 @@
 #include <termios.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
-
+#include <atomic>
 namespace Cli {
 
 struct TermSize {
@@ -20,6 +20,7 @@ namespace Key {
     constexpr int PAGE_DOWN   = 1005;
     constexpr int HOME        = 1006;
     constexpr int END         = 1007;
+    constexpr int RESIZE = 1008;
     constexpr int ESC         = 27;
     constexpr int TAB         = 9;
 }
@@ -82,5 +83,13 @@ private:
     unsigned int center_row = 0;
     /* default terminal settings */
     struct termios old_termios_{};
+
+
+    int sig_pipe_[2] = {-1, -1};  // [0] = read end, [1] = write end
+    static std::atomic<int> winch_pipe_write_fd_;  // для signal handler
+
+    void setup_sigwinch();
+    void teardown_sigwinch();
+    static void sigwinch_handler(int);
 };
 } // namespace Cli

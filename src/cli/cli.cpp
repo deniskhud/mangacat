@@ -1,5 +1,37 @@
 #include "cli.hpp"
 
+#include <csignal>
+#include <poll.h>
+#include <fcntl.h>
+
+std::atomic<int> Cli::Terminal::winch_pipe_write_fd_{-1};
+
+void Cli::Terminal::sigwinch_handler(int) {
+    // Только async-signal-safe операции!
+    int fd = winch_pipe_write_fd_.load(std::memory_order_relaxed);
+    if (fd != -1) {
+        char b = 1;
+        ::write(fd, &b, 1);
+    }
+}
+
+void Cli::Terminal::setup_sigwinch() {
+    pipe2(sig_pipe_, O_NONBLOCK | O_CLOEXEC);
+    winch_pipe_write_fd_.store(sig_pipe_[1], std::memory_order_relaxed);
+
+    struct sigaction sa{};
+    sa.sa_handler = sigwinch_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    sigaction(SIGWINCH, &sa, nullptr);
+}
+
+void Cli::Terminal::teardown_sigwinch() {
+    signal(SIGWINCH, SIG_DFL);
+    winch_pipe_write_fd_.store(-1, std::memory_order_relaxed);
+    close(sig_pipe_[0]);
+    close(sig_pipe_[1]);
+}
 
 Cli::Terminal::Terminal() {
     size = query_size();

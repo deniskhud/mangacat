@@ -21,19 +21,25 @@ ViewerApp::ViewerApp(const std::string& path)
 // ── Главный цикл ───────────────────────────────────────────────────────────
 
 void ViewerApp::run() {
-    //terminal_.set_raw_mode(true);
-    terminal_.hide_cursor();
     terminal_.clear();
 
     render_current();
 
     while (running_) {
         int key = terminal_.read_key();
+        if (key == Cli::Key::RESIZE) {
+            terminal_.refresh_size();
+            auto sz = terminal_.get_terminal_size();
+
+            renderer_.resize(sz);   // пересчитать layout
+            terminal_.clear();
+            render_current();     // перерисовать всё
+            continue;
+        }
         handle_input(key);
     }
 
     terminal_.show_cursor();
-    //terminal_._raw_mode(false);
     terminal_.clear();
 }
 
