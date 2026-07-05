@@ -52,7 +52,7 @@ std::shared_ptr<ImageData> ImageLoader::load(const fs::path& path) const {
     stbi_image_free(pixels);
     img->loaded = true;
 
-    std::cerr << "[ImageLoader] loaded: " << path << "\n";
+    //std::cerr << "[ImageLoader] loaded: " << path << "\n";
     return img;
 }
 

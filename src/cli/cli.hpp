@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <string>
 #include <termios.h>
 #include <unistd.h>
@@ -7,10 +8,10 @@
 namespace Cli {
 
 struct TermSize {
-    unsigned int cols, rows, pixel_height, pixel_width;
+    std::uint32_t cols, rows, pixel_height, pixel_width;
 };
 
-// Специальные клавиши — выше ASCII чтобы не пересекаться
+
 namespace Key {
     constexpr int ARROW_LEFT  = 1000;
     constexpr int ARROW_RIGHT = 1001;
@@ -20,27 +21,44 @@ namespace Key {
     constexpr int PAGE_DOWN   = 1005;
     constexpr int HOME        = 1006;
     constexpr int END         = 1007;
-    constexpr int RESIZE = 1008;
+    constexpr int RESIZE      = 1008;
     constexpr int ESC         = 27;
     constexpr int TAB         = 9;
 }
 
-class Terminal {
+enum class InputEventType {
+    Key,
+    Resize,
+};
+
+struct InputEvent {
+    InputEventType type;
+    int key = 0;
+
+    static InputEvent key_event(int value) {
+        return {InputEventType::Key, value};
+    }
+
+    static InputEvent resize_event() {
+        return {InputEventType::Resize, 0};
+    }
+};
+
+class Terminal final {
 public:
     Terminal();
 
     ~Terminal() {
         show_cursor();
+        teardown_sigwinch();
         disable_raw_mode();
-        write(STDOUT_FILENO, "\033[?1049l", 8);  // restore screen
+        write(STDOUT_FILENO, "\033[?1049l", 8);
     }
 
-    // ── Ввод ──────────────────────────────────────────────────────────
-    // Блокирует до нажатия клавиши.
-    // Возвращает ASCII-код или Cli::Key::* для спецклавиш.
+    InputEvent read_event() const;
     int read_key() const;
 
-    // ── Вывод ─────────────────────────────────────────────────────────
+
     void draw_at(unsigned int col, unsigned int row, const std::string& text) const {
         std::string cmd = "\033[" + std::to_string(row) + ";"
                         + std::to_string(col) + "H" + text;
@@ -55,7 +73,7 @@ public:
 
     /* refresh size terminal */
     void refresh_size() {
-        size = query_size();
+        size = queryTermSize();
         center_row = (size.rows / 2) + 1;
         center_col = (size.cols / 2) + 1;
     }
@@ -64,7 +82,7 @@ public:
 
 private:
     /* requests the size of the terminal, for ex when changing the size */
-    static TermSize query_size() {
+    static TermSize queryTermSize() {
         struct winsize w;
         ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
         return { w.ws_col, w.ws_row, w.ws_ypixel, w.ws_xpixel };
@@ -79,8 +97,8 @@ private:
 
     /* terminal size, pixel height/width */
     TermSize size{};
-    unsigned int center_col = 0;
-    unsigned int center_row = 0;
+    std::uint32_t center_col = 0;
+    std::uint32_t center_row = 0;
     /* default terminal settings */
     struct termios old_termios_{};
 
@@ -91,5 +109,8 @@ private:
     void setup_sigwinch();
     void teardown_sigwinch();
     static void sigwinch_handler(int);
+    int read_key_from_stdin() const;
+    bool read_stdin_byte(char& c, int timeout_ms) const;
+    void drain_resize_pipe() const;
 };
 } // namespace Cli

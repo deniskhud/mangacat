@@ -1,5 +1,6 @@
 #ifndef DIRECTORYSCANNER_HPP
 #define DIRECTORYSCANNER_HPP
+#include <algorithm>
 #include <filesystem>
 #include <stdexcept>
 #include <string>
@@ -24,7 +25,8 @@ namespace Backend {
 class DirectoryScanner {
 public:
     // Поддерживаемые расширения (регистронезависимо через lowercase)
-    static constexpr const char* EXTENSIONS[] = {
+
+    const std::vector<std::string> EXTENSIONS {
         ".jpg", ".jpeg", ".png", ".webp"
     };
 
@@ -48,7 +50,7 @@ public:
             if (is_supported(entry.path()))
                 pages_.push_back(entry.path());
         }
-        sort();
+        sortPages();
     }
     /** getters **/
     [[nodiscard]] const std::vector<fs::path>& get_pages() const { return pages_; }
@@ -57,16 +59,19 @@ public:
     bool is_empty() const { return pages_.empty(); }
 
 private:
-    static bool is_supported(const fs::path& p) {
+    bool is_supported(const fs::path& p) {
         std::string ext = p.extension().string();
         // в lowercase для регистронезависимого сравнения
         for (char& c : ext) c = static_cast<char>(std::tolower(c));
-        for (const char* supported : EXTENSIONS)
-            if (ext == supported) return true;
-        return false;
+
+        bool isSupported = std::ranges::any_of(EXTENSIONS, [&ext](auto& extension) {
+            return ext == extension;
+        });
+
+        return isSupported;
     }
 
-    void sort() {
+    void sortPages() {
         std::sort(pages_.begin(), pages_.end(), [](const fs::path& a, const fs::path& b) {
             try {
                 return std::stoi(a.stem().string()) < std::stoi(b.stem().string());
@@ -77,7 +82,7 @@ private:
     }
     /* full directory path */
     fs::path current_path_;
-    /* array of pictures */
+    /* array of path pictures */
     std::vector<fs::path> pages_;
 };
 } // namespace Backend

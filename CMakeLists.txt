@@ -27,8 +27,8 @@ add_executable(cli_manga_reader src/main.cpp
         src/backend/Navigator.hpp
         src/backend/ImageLoader.cpp
         src/backend/DirectoryScanner.hpp
-        src/backend/ViewerApp.hpp
-        src/backend/ViewerApp.cpp
+        src/app/ViewerApp.hpp
+        src/app/ViewerApp.cpp
 )
 
 target_include_directories(cli_manga_reader PRIVATE

@@ -46,7 +46,7 @@ namespace Renderer {
             write(STDOUT_FILENO, move_cmd.c_str(), move_cmd.length());
         }
         Cli::TermSize termSize;
-        Cli::Terminal term_;
+        const Cli::Terminal& term_;
         unsigned int center_col = 0, center_row = 0;
     public:
         Image(const Cli::Terminal& term);

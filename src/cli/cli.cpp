@@ -1,10 +1,21 @@
 #include "cli.hpp"
 
+#include <cerrno>
 #include <csignal>
 #include <poll.h>
 #include <fcntl.h>
 
 std::atomic<int> Cli::Terminal::winch_pipe_write_fd_{-1};
+
+
+Cli::Terminal::Terminal() {
+    write(STDOUT_FILENO, "\033[?1049h", 8);
+
+    enable_raw_mode();
+    setup_sigwinch();
+    refresh_size();
+    hide_cursor();
+}
 
 void Cli::Terminal::sigwinch_handler(int) {
     // Только async-signal-safe операции!
@@ -16,7 +27,8 @@ void Cli::Terminal::sigwinch_handler(int) {
 }
 
 void Cli::Terminal::setup_sigwinch() {
-    pipe2(sig_pipe_, O_NONBLOCK | O_CLOEXEC);
+    if (pipe2(sig_pipe_, O_NONBLOCK | O_CLOEXEC) == -1) return;
+
     winch_pipe_write_fd_.store(sig_pipe_[1], std::memory_order_relaxed);
 
     struct sigaction sa{};
@@ -29,18 +41,10 @@ void Cli::Terminal::setup_sigwinch() {
 void Cli::Terminal::teardown_sigwinch() {
     signal(SIGWINCH, SIG_DFL);
     winch_pipe_write_fd_.store(-1, std::memory_order_relaxed);
-    close(sig_pipe_[0]);
-    close(sig_pipe_[1]);
-}
-
-Cli::Terminal::Terminal() {
-    size = query_size();
-    center_row = (size.rows / 2) + 1;
-    center_col = (size.cols / 2) + 1;
-    write(STDOUT_FILENO, "\033[?1049h", 8);  // alternate screen
-    enable_raw_mode();
-    refresh_size();
-    hide_cursor();
+    if (sig_pipe_[0] != -1) close(sig_pipe_[0]);
+    if (sig_pipe_[1] != -1) close(sig_pipe_[1]);
+    sig_pipe_[0] = -1;
+    sig_pipe_[1] = -1;
 }
 
 void Cli::Terminal::enable_raw_mode() {
@@ -54,18 +58,48 @@ void Cli::Terminal::enable_raw_mode() {
     tcsetattr(STDIN_FILENO, TCSANOW, &raw);
 }
 
+Cli::InputEvent Cli::Terminal::read_event() const {
+    while (true) {
+        pollfd fds[2] = {
+            {STDIN_FILENO, POLLIN, 0},
+            {sig_pipe_[0], POLLIN, 0},
+        };
+        const nfds_t fd_count = sig_pipe_[0] == -1 ? 1 : 2;
 
-int Cli::Terminal::read_key()const  {
+        int result = poll(fds, fd_count, -1);
+        if (result == -1) {
+            if (errno == EINTR) continue;
+            return InputEvent::key_event(Key::ESC);
+        }
 
+        if (fd_count == 2 && (fds[1].revents & POLLIN)) {
+            drain_resize_pipe();
+            return InputEvent::resize_event();
+        }
+
+        if (fds[0].revents & POLLIN) {
+            return InputEvent::key_event(read_key_from_stdin());
+        }
+    }
+}
+
+
+int Cli::Terminal::read_key() const {
+    InputEvent event = read_event();
+    if (event.type == InputEventType::Resize) return Key::RESIZE;
+    return event.key;
+}
+
+int Cli::Terminal::read_key_from_stdin() const {
     char c;
-    while (read(STDIN_FILENO, &c, 1) != 1) {}
+    if (!read_stdin_byte(c, -1)) return Key::ESC;
 
     if (c != '\033') return static_cast<int>(c);
 
     // Escape-последовательность: читаем остаток
     char seq[3] = {};
-    if (read(STDIN_FILENO, &seq[0], 1) != 1) return Key::ESC;
-    if (read(STDIN_FILENO, &seq[1], 1) != 1) return Key::ESC;
+    if (!read_stdin_byte(seq[0], 25)) return Key::ESC;
+    if (!read_stdin_byte(seq[1], 25)) return Key::ESC;
 
     if (seq[0] == '[') {
         // Стрелки: \033[A \033[B \033[C \033[D
@@ -80,13 +114,40 @@ int Cli::Terminal::read_key()const  {
         // Page Up/Down: \033[5~ \033[6~
         if (seq[1] == '5' || seq[1] == '6') {
             char tilde;
-            read(STDIN_FILENO, &tilde, 1);
+            if (!read_stdin_byte(tilde, 25)) return Key::ESC;
             if (tilde == '~')
                 return seq[1] == '5' ? Key::PAGE_UP : Key::PAGE_DOWN;
         }
     }
 
     return Key::ESC;
+}
+
+bool Cli::Terminal::read_stdin_byte(char& c, int timeout_ms) const {
+    while (true) {
+        pollfd fd = {STDIN_FILENO, POLLIN, 0};
+        int result = poll(&fd, 1, timeout_ms);
+
+        if (result == 0) return false;
+        if (result == -1) {
+            if (errno == EINTR) continue;
+            return false;
+        }
+        if (fd.revents & (POLLERR | POLLHUP | POLLNVAL)) return false;
+        if (!(fd.revents & POLLIN)) continue;
+
+        ssize_t n = read(STDIN_FILENO, &c, 1);
+        if (n == 1) return true;
+        if (n == -1 && errno == EINTR) continue;
+        return false;
+    }
+}
+
+void Cli::Terminal::drain_resize_pipe() const {
+    if (sig_pipe_[0] == -1) return;
+
+    char buf[64];
+    while (read(sig_pipe_[0], buf, sizeof(buf)) > 0) {}
 }
 
 void Cli::Terminal::clear_at(unsigned int col, unsigned int row, unsigned int width, unsigned int height) const {
