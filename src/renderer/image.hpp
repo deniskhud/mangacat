@@ -1,9 +1,6 @@
-#ifndef IMAGE_HPP
-#define IMAGE_HPP
+#pragma once
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "../backend/ImageData.hpp"
-
-#endif //IMAGE_HPP

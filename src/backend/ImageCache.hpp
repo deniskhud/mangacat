@@ -12,24 +12,24 @@ namespace Backend {
 
 class ImageCache {
 public:
-    explicit ImageCache(size_t max_size = 8) : max_size_(max_size) {}
+    explicit ImageCache(size_t maxSize = 8) : maxSize(maxSize) {}
 
     std::shared_ptr<ImageData> get(const fs::path& path) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        return get_unlocked(path.string());
+        std::lock_guard<std::mutex> lock(mutex);
+        return getUnlocked(path.string());
     }
 
     void put(const fs::path& path, std::shared_ptr<ImageData> img) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        put_unlocked(path.string(), std::move(img));
+        std::lock_guard<std::mutex> lock(mutex);
+        putUnlocked(path.string(), std::move(img));
     }
 
     template<typename Loader>
-    std::shared_ptr<ImageData> get_or_load(const fs::path& path, Loader&& loader) {
+    std::shared_ptr<ImageData> getOrLoad(const fs::path& path, Loader&& loader) {
         // Сначала пробуем взять из кеша без загрузки
         {
-            std::lock_guard<std::mutex> lock(mutex_);
-            if (auto img = get_unlocked(path.string())) return img;
+            std::lock_guard<std::mutex> lock(mutex);
+            if (auto img = getUnlocked(path.string())) return img;
         }
 
         // Грузим без лока — загрузка долгая, не стоит держать мьютекс
@@ -37,59 +37,59 @@ public:
 
         // Кладём результат в кеш
         if (img) {
-            std::lock_guard<std::mutex> lock(mutex_);
-            put_unlocked(path.string(), img);
+            std::lock_guard<std::mutex> lock(mutex);
+            putUnlocked(path.string(), img);
         }
 
         return img;
     }
 
     void clear() {
-        std::lock_guard<std::mutex> lock(mutex_);
-        map_.clear();
-        lru_.clear();
+        std::lock_guard<std::mutex> lock(mutex);
+        entries.clear();
+        lruKeys.clear();
     }
 
-    size_t size() const { return map_.size(); }
-    size_t capacity() const { return max_size_; }
+    size_t size() const { return entries.size(); }
+    size_t capacity() const { return maxSize; }
 
 private:
     struct Entry {
         std::shared_ptr<ImageData>       data;
-        std::list<std::string>::iterator lru_it;
+        std::list<std::string>::iterator lruIt;
     };
 
     // Вызывать только под lock
-    std::shared_ptr<ImageData> get_unlocked(const std::string& key) {
-        auto it = map_.find(key);
-        if (it == map_.end()) return nullptr;
-        lru_.splice(lru_.begin(), lru_, it->second.lru_it);
+    std::shared_ptr<ImageData> getUnlocked(const std::string& key) {
+        auto it = entries.find(key);
+        if (it == entries.end()) return nullptr;
+        lruKeys.splice(lruKeys.begin(), lruKeys, it->second.lruIt);
         return it->second.data;
     }
 
     // Вызывать только под lock
-    void put_unlocked(const std::string& key, std::shared_ptr<ImageData> img) {
-        auto it = map_.find(key);
-        if (it != map_.end()) {
+    void putUnlocked(const std::string& key, std::shared_ptr<ImageData> img) {
+        auto it = entries.find(key);
+        if (it != entries.end()) {
             it->second.data = std::move(img);
-            lru_.splice(lru_.begin(), lru_, it->second.lru_it);
+            lruKeys.splice(lruKeys.begin(), lruKeys, it->second.lruIt);
             return;
         }
-        if (map_.size() >= max_size_) evict();
-        lru_.push_front(key);
-        map_[key] = { std::move(img), lru_.begin() };
+        if (entries.size() >= maxSize) evict();
+        lruKeys.push_front(key);
+        entries[key] = { std::move(img), lruKeys.begin() };
     }
 
     void evict() {
-        if (lru_.empty()) return;
-        map_.erase(lru_.back());
-        lru_.pop_back();
+        if (lruKeys.empty()) return;
+        entries.erase(lruKeys.back());
+        lruKeys.pop_back();
     }
 
-    mutable std::mutex mutex_;
-    size_t max_size_;
-    std::unordered_map<std::string, Entry> map_;
-    std::list<std::string> lru_;
+    mutable std::mutex mutex;
+    size_t maxSize;
+    std::unordered_map<std::string, Entry> entries;
+    std::list<std::string> lruKeys;
 };
 
 } // namespace Backend

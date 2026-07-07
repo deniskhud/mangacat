@@ -1,5 +1,4 @@
-#ifndef IMAGELOADER_HPP
-#define IMAGELOADER_HPP
+#pragma once
 
 #include <cstdint>
 #include <filesystem>
@@ -21,8 +20,8 @@ namespace Backend {
      *   ImageLoader loader;
      *   auto img = loader.load(path);   // nullptr если не удалось
      *
-     *   // Или как callable для ImageCache::get_or_load:
-     *   cache.get_or_load(path, loader);
+     *   // Или как callable для ImageCache::getOrLoad:
+     *   cache.getOrLoad(path, loader);
      */
     class ImageLoader {
     public:
@@ -35,14 +34,12 @@ namespace Backend {
             return load(path);
         }
 
-        ImageLoader(const Cli::TermSize& size) : term_size_(size) {  }
+        ImageLoader(const Cli::TermSize& size) : termSize(size) {  }
     private:
-        // base64 нужен только здесь — оставляем внутри загрузчика
-        static std::string base64_encode(const uint8_t* data, size_t len);
-        Cli::TermSize term_size_;
-        static constexpr const char* B64 =
+        static std::string base64Encode(const uint8_t* data, size_t len);
+        Cli::TermSize termSize;
+        static constexpr const char* b64 =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     };
 
 } // namespace Backend
-#endif //IMAGELOADER_HPP

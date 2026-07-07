@@ -1,5 +1,4 @@
-#ifndef BACKEND_HPP
-#define BACKEND_HPP
+#pragma once
 #include <filesystem>
 #include <vector>
 #include <deque>
@@ -7,7 +6,6 @@ namespace fs = std::filesystem;
 /*TODO поддержка смены директории, маленький файловый менеджер(передвигаться по директориям)*/
 /*TODO поддержка отрытия директории по пути */
 #include "ImageData.hpp"
-#include <future>
 /*короче фотки будем хранить не все, будем хранить текущую и рядом с ней типо так   - - - * - - -
  *делаем связный список, храним указатели на вектор байтов
  *
@@ -27,35 +25,33 @@ namespace Backend {
      */
     class DirectoryLoader {
     private:
-        fs::path current_path;
+        fs::path currentPath;
         std::vector<fs::path> pages;
-        size_t current_page = 0;
-        void change_directory(const fs::path& new_path);
-        void get_images_from_directory();
+        size_t currentPage = 0;
+        void changeDirectory(const fs::path& newPath);
+        void getImagesFromDirectory();
 
-        std::deque<std::shared_ptr<ImageData>> deque_;
+        std::deque<std::shared_ptr<ImageData>> deque;
 
-        void debug_m();
+        void debugM();
     public:
-        void move_right() {
-            if (current_page == pages.size()) return;
-            current_page++;
+        void moveRight() {
+            if (currentPage == pages.size()) return;
+            currentPage++;
         }
-        void move_left() {
-            if (current_page == 0) return;
-            current_page--;
+        void moveLeft() {
+            if (currentPage == 0) return;
+            currentPage--;
         }
 
-        [[nodiscard]]std::shared_ptr<ImageData> get_image_data() {
-            return deque_[2];
+        [[nodiscard]]std::shared_ptr<ImageData> getImageData() {
+            return deque[2];
         }
-        [[nodiscard]] std::string get_page_by_index(size_t index) const;
+        [[nodiscard]] std::string getPageByIndex(size_t index) const;
 
-        void step_right();
-        void step_left();
+        void stepRight();
+        void stepLeft();
 
         DirectoryLoader(const fs::path& cpath);
     };
 }
-
-#endif //BACKEND_HPP

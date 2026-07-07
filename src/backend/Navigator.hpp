@@ -1,12 +1,14 @@
 #pragma once
+#include <algorithm>
 #include <deque>
 #include <filesystem>
 #include <functional>
-#include <future>
 #include <memory>
+#include <utility>
 #include <vector>
 #include "ImageCache.hpp"
 #include "ImageData.hpp"
+#include "ImageLoadWorker.hpp"
 
 namespace fs = std::filesystem;
 
@@ -14,133 +16,195 @@ namespace Backend {
 
 class Navigator {
 public:
-    static constexpr size_t LOOKAHEAD = 2;
-    static constexpr size_t WINDOW    = 2 * LOOKAHEAD + 1;
+    static constexpr size_t lookahead = 2;
+    static constexpr size_t windowSize = 2 * lookahead + 1;
+    static constexpr size_t forwardPrefetch = 8;
+    static constexpr size_t backwardPrefetch = 3;
 
     using LoaderFn = std::function<std::shared_ptr<ImageData>(const fs::path&)>;
 
-    Navigator(const std::vector<fs::path>& pages, ImageCache& cache, LoaderFn loader)
-        : pages_(pages), cache_(cache), loader_(std::move(loader))
+    Navigator(
+        const std::vector<fs::path>& pages,
+        ImageCache& cache,
+        LoaderFn loader,
+        ImageLoadWorker& loadWorkerRef
+    )
+        : pages(pages)
+        , cache(cache)
+        , loader(std::move(loader))
+        , loadWorker(loadWorkerRef)
     {
-        build_window(0);
-    }
-
-    ~Navigator() {
-        wait_prefetch();
+        buildWindow(0);
     }
 
     // ── Навигация ─────────────────────────────────────────────────────
 
     void next() {
-        if (!has_next()) return;
-        ++cursor_;
-        slide_right();
-        prefetch_async(cursor_ + 1);   // грузим cursor+2 в фоне
+        if (!hasNext()) return;
+        direction = Direction::Forward;
+        ++cursor;
+        slideRight();
+        prefetchNearby();
     }
 
     void prev() {
-        if (!has_prev()) return;
-        --cursor_;
-        slide_left();
-        if (cursor_ >= 2)              // защита от size_t underflow
-            prefetch_async(cursor_ - 1);
+        if (!hasPrev()) return;
+        direction = Direction::Backward;
+        --cursor;
+        slideLeft();
+        prefetchNearby();
     }
 
     void jump(size_t index) {
-        if (index >= pages_.size()) return;
-        wait_prefetch();
-        cursor_ = index;
-        build_window(cursor_);
+        if (index >= pages.size()) return;
+        cursor = index;
+        buildWindow(cursor);
     }
 
     // ── Доступ ────────────────────────────────────────────────────────
     //
-    // current() возвращает nullptr если картинка ещё не загружена —
-    // рендер покажет Loading... и перерисует когда данные придут.
+    // Текущая страница берётся из окна или кеша. Если worker не успел,
+    // renderer может показать Loading без блокировки главного потока.
 
-    std::shared_ptr<ImageData> current()      const { return window_get(cursor_); }
-    const fs::path&            current_path() const { return pages_[cursor_]; }
-    size_t                     current_index() const { return cursor_; }
-    size_t                     total()         const { return pages_.size(); }
-    bool                       has_next()      const { return cursor_ + 1 < pages_.size(); }
-    bool                       has_prev()      const { return cursor_ > 0; }
+    std::shared_ptr<ImageData> current()      { return windowGet(cursor); }
+    const fs::path&            currentPath() const { return pages[cursor]; }
+    size_t                     currentIndex() const { return cursor; }
+    size_t                     total()         const { return pages.size(); }
+    bool                       hasNext()      const { return cursor + 1 < pages.size(); }
+    bool                       hasPrev()      const { return cursor > 0; }
 
 private:
     // ── Окно ──────────────────────────────────────────────────────────
 
-    std::deque<std::shared_ptr<ImageData>> deque_;
-    size_t window_start_ = 0;
+    std::deque<std::shared_ptr<ImageData>> deque;
+    size_t windowStart = 0;
+    enum class Direction {
+        Forward,
+        Backward,
+    };
+    Direction direction = Direction::Forward;
 
-    void build_window(size_t index) {
-        deque_.clear();
-        size_t start     = (index >= LOOKAHEAD) ? index - LOOKAHEAD : 0;
-        window_start_    = start;
-        size_t end       = std::min(start + WINDOW, pages_.size());
-        for (size_t i = start; i < end; ++i)
-            deque_.push_back(load_sync(pages_[i]));
-    }
-
-    void slide_right() {
-        if (cursor_ - window_start_ > LOOKAHEAD && !deque_.empty()) {
-            deque_.pop_front();
-            ++window_start_;
+    void buildWindow(size_t index) {
+        deque.clear();
+        size_t start = (index >= lookahead) ? index - lookahead : 0;
+        windowStart = start;
+        size_t end = std::min(start + windowSize, pages.size());
+        for (size_t i = start; i < end; ++i) {
+            if (i == cursor) {
+                deque.push_back(loadSync(pages[i]));
+            } else {
+                deque.push_back(cachedOrRequest(i, ImageLoadWorker::Priority::Normal));
+            }
         }
-        size_t right = window_start_ + deque_.size();
-        if (right < pages_.size())
-            deque_.push_back(load_sync(pages_[right]));
+        prefetchNearby();
     }
 
-    void slide_left() {
-        size_t pos_in_window = cursor_ - window_start_;
-        if (!deque_.empty() && (deque_.size() - 1 - pos_in_window) > LOOKAHEAD)
-            deque_.pop_back();
-        if (window_start_ > 0) {
-            --window_start_;
-            deque_.push_front(load_sync(pages_[window_start_]));
+    void slideRight() {
+        if (cursor - windowStart > lookahead && !deque.empty()) {
+            deque.pop_front();
+            ++windowStart;
+        }
+        size_t right = windowStart + deque.size();
+        if (right < pages.size())
+            deque.push_back(cachedOrRequest(right, ImageLoadWorker::Priority::High));
+    }
+
+    void slideLeft() {
+        size_t posInWindow = cursor - windowStart;
+        if (!deque.empty() && (deque.size() - 1 - posInWindow) > lookahead)
+            deque.pop_back();
+        if (windowStart > 0) {
+            --windowStart;
+            deque.push_front(cachedOrRequest(windowStart, ImageLoadWorker::Priority::High));
         }
     }
 
-    std::shared_ptr<ImageData> window_get(size_t page_index) const {
-        if (page_index < window_start_) return nullptr;
-        size_t pos = page_index - window_start_;
-        if (pos >= deque_.size()) return nullptr;
-        return deque_[pos];
+    std::shared_ptr<ImageData> windowGet(size_t pageIndex) {
+        if (pageIndex < windowStart) return nullptr;
+        size_t pos = pageIndex - windowStart;
+        if (pos >= deque.size()) return nullptr;
+
+        auto& slot = deque[pos];
+        if (!slot) {
+            slot = cache.get(pages[pageIndex]);
+            if (!slot) {
+                loadWorker.request(pages[pageIndex], ImageLoadWorker::Priority::High);
+            }
+        }
+
+        return slot;
     }
 
     // ── Загрузка ──────────────────────────────────────────────────────
 
     // Синхронная — для текущего окна, зовётся из главного потока
-    std::shared_ptr<ImageData> load_sync(const fs::path& p) {
-        return cache_.get_or_load(p, loader_);
+    std::shared_ptr<ImageData> loadSync(const fs::path& p) {
+        return cache.getOrLoad(p, loader);
     }
 
-    // Асинхронная предзагрузка — кладёт результат в кеш в фоне.
-    // Следующий вызов load_sync для того же пути возьмёт из кеша мгновенно.
-    std::future<void> prefetch_future_;
+    std::shared_ptr<ImageData> cachedOrRequest(size_t index, ImageLoadWorker::Priority priority) {
+        if (index >= pages.size()) return nullptr;
 
-    void prefetch_async(size_t index) {
-        if (index >= pages_.size()) return;
-        if (cache_.get(pages_[index])) return;  // уже в кеше
-
-        wait_prefetch();  // вариант А: ждём предыдущую задачу
-
-        fs::path path = pages_[index];
-        prefetch_future_ = std::async(std::launch::async, [this, path]() {
-            cache_.get_or_load(path, loader_);
-        });
+        auto img = cache.get(pages[index]);
+        if (!img) {
+            loadWorker.request(pages[index], priority);
+        }
+        return img;
     }
 
-    void wait_prefetch() {
-        if (prefetch_future_.valid())
-            prefetch_future_.wait();
+    void prefetchIndex(size_t index, ImageLoadWorker::Priority priority) {
+        if (index >= pages.size()) return;
+        loadWorker.request(pages[index], priority);
     }
 
-    // ── Данные ────────────────────────────────────────────────────────
+    void prefetchNearby() {
+        if (direction == Direction::Forward) {
+            prefetchForward(ImageLoadWorker::Priority::High);
+            prefetchBackward(ImageLoadWorker::Priority::Normal);
+        } else {
+            prefetchBackward(ImageLoadWorker::Priority::High);
+            prefetchForward(ImageLoadWorker::Priority::Normal);
+        }
+    }
 
-    const std::vector<fs::path>& pages_;
-    ImageCache&                  cache_;
-    LoaderFn                     loader_;
-    size_t                       cursor_ = 0;
+    void prefetchForward(ImageLoadWorker::Priority priority) {
+        size_t first = cursor + 1;
+        size_t last = std::min(cursor + forwardPrefetch, pages.size() - 1);
+
+        if (first > last) return;
+
+        if (priority == ImageLoadWorker::Priority::High) {
+            for (size_t index = last + 1; index-- > first;) {
+                prefetchIndex(index, priority);
+            }
+        } else {
+            for (size_t index = first; index <= last; ++index) {
+                prefetchIndex(index, priority);
+            }
+        }
+    }
+
+    void prefetchBackward(ImageLoadWorker::Priority priority) {
+        if (cursor == 0) return;
+
+        size_t first = cursor > backwardPrefetch ? cursor - backwardPrefetch : 0;
+        size_t last = cursor - 1;
+
+        if (priority == ImageLoadWorker::Priority::High) {
+            for (size_t index = first; index <= last; ++index) {
+                prefetchIndex(index, priority);
+            }
+        } else {
+            for (size_t index = last + 1; index-- > first;) {
+                prefetchIndex(index, priority);
+            }
+        }
+    }
+    const std::vector<fs::path>& pages;
+    ImageCache&                  cache;
+    LoaderFn                     loader;
+    ImageLoadWorker&             loadWorker;
+    size_t                       cursor = 0;
 };
 
 } // namespace Backend

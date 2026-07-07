@@ -1,5 +1,4 @@
-#ifndef RENDERER_HPP
-#define RENDERER_HPP
+#pragma once
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -25,54 +24,55 @@ struct Pos {
 namespace Renderer {
     class Image {
     private:
-        int last_w_ = 0, last_h_ = 0;
-        int last_x_ = 0, last_y_ = 0;
+        int lastWidth = 0, lastHeight = 0;
+        int lastX = 0, lastY = 0;
 
-        bool needs_clear(const ImageLayout& layout) const {
+        bool needsClear(const ImageLayout& layout) const {
             // Первый кадр — всегда clear
-            if (last_w_ == 0 && last_h_ == 0) return true;
+            if (lastWidth == 0 && lastHeight == 0) return true;
             // Новая картинка меньше — старые пиксели останутся по краям
-            return layout.out_w < last_w_ || layout.out_h < last_h_;
+            return layout.layoutWidth < lastWidth || layout.layoutHeight < lastHeight;
         }
 
 
 
         Pos position{};
-        void set_cursor_center(const std::shared_ptr<ImageData>& img) {
-            std::string move_cmd = "\033[" + std::to_string(img->layout.y) + ";"
+        void setCursorCenter(const std::shared_ptr<ImageData>& img) {
+            std::string moveCommand = "\033[" + std::to_string(img->layout.y) + ";"
                                    + std::to_string(img->layout.x) + "H";
-            /*std::string move_cmd = "\033[" + std::to_string(center_row) + ";"
-                                   + std::to_string(center_col) + "H";*/
-            write(STDOUT_FILENO, move_cmd.c_str(), move_cmd.length());
+            /*std::string moveCommand = "\033[" + std::to_string(centerRow) + ";"
+                                   + std::to_string(centerCol) + "H";*/
+            write(STDOUT_FILENO, moveCommand.c_str(), moveCommand.length());
         }
         Cli::TermSize termSize;
-        const Cli::Terminal& term_;
-        unsigned int center_col = 0, center_row = 0;
+        const Cli::Terminal& terminal;
+        unsigned int centerCol = 0, centerRow = 0;
     public:
         Image(const Cli::Terminal& term);
-        void render_loading();
+        void renderLoading();
         void render(const std::shared_ptr<ImageData>& img);
     };
 
     class Renderer {
     private:
         //buffer to render
-        std::vector<std::vector<char>> render_buffer;
-        std::vector<std::vector<std::string>> char_buffer;
+        std::vector<std::vector<char>> renderBuffer;
+        std::vector<std::vector<std::string>> charBuffer;
         Cli::TermSize termSize;
+        Image imageEngine;
 
-
-        void set_char(unsigned int x, unsigned int y, char ch);
+        void setChar(unsigned int x, unsigned int y, char ch);
     public:
-        void clear_buffer();
-        void clear_image_buffer();
-        void draw_top_right_rect(int width, int height);
-        void draw_rect(int x, int y, int w, int h);
-        Renderer(const Cli::TermSize& term_size) {
-            termSize = term_size;
-            render_buffer.resize(term_size.cols, std::vector<char>(term_size.rows));
+        void clearBuffer();
+        void clearImageBuffer();
+        void drawTopRightRect(int width, int height);
+        void drawRect(int x, int y, int w, int h);
+        Renderer(const Cli::Terminal& term) : imageEngine(term) {
+            termSize = term.getTerminalSize();
+            renderBuffer.resize(termSize.cols, std::vector<char>(termSize.rows));
         }
-        void render(Image& img_engine, const std::shared_ptr<ImageData>& data);
+
+        void render(const std::shared_ptr<ImageData>& data);
 
 
     };
@@ -90,24 +90,24 @@ namespace Renderer {
 
 
 
-    inline void draw_separator(Cli::Terminal& term, const Cli::TermSize& size) {
-        unsigned int left_width = size.cols / 2;
+    inline void drawSeparator(Cli::Terminal& term, const Cli::TermSize& size) {
+        unsigned int leftWidth = size.cols / 2;
         for (unsigned int i = 1; i <= size.rows; ++i) {
-            term.draw_at(left_width, i, "│");
+            term.drawAt(leftWidth, i, "│");
         }
     }
-    inline void draw_horizontal_separator(Cli::Terminal& term, const Cli::TermSize& size) {
+    inline void drawHorizontalSeparator(Cli::Terminal& term, const Cli::TermSize& size) {
 
     }
 
 
     struct ColumnLayout {
-        unsigned int left_width;
-        unsigned int right_width;
+        unsigned int leftWidth;
+        unsigned int rightWidth;
 
         ColumnLayout(const Cli::TermSize& size) {
-            left_width = size.cols / 2;
-            right_width = size.cols - left_width;
+            leftWidth = size.cols / 2;
+            rightWidth = size.cols - leftWidth;
         }
 
 
@@ -126,9 +126,8 @@ namespace Renderer {
             }
             bar += "]";
 
-            term.draw_at(x, y, bar);
+            term.drawAt(x, y, bar);
         }
     };
 
 }
-#endif //RENDERER_HPP

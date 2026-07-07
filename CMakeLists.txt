@@ -4,6 +4,7 @@ project(cli_manga_reader)
 set(CMAKE_CXX_STANDARD 23)
 
 find_package(PkgConfig REQUIRED)
+find_package(Threads REQUIRED)
 
 
 add_executable(cli_manga_reader src/main.cpp
@@ -24,11 +25,14 @@ add_executable(cli_manga_reader src/main.cpp
         src/stb.cpp
         src/backend/ImageLoader.hpp
         src/backend/ImageCache.hpp
+        src/backend/ImageLoadWorker.hpp
+        src/backend/ImageLoadWorker.cpp
         src/backend/Navigator.hpp
         src/backend/ImageLoader.cpp
         src/backend/DirectoryScanner.hpp
         src/app/ViewerApp.hpp
         src/app/ViewerApp.cpp
+        src/backend/DirectoryScanner.cpp
 )
 
 target_include_directories(cli_manga_reader PRIVATE
@@ -36,6 +40,7 @@ target_include_directories(cli_manga_reader PRIVATE
 )
 
 target_link_libraries(cli_manga_reader
+        PRIVATE Threads::Threads
 )
 
 
