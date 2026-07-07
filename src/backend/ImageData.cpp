@@ -3,7 +3,7 @@
 #include "../stb_image_resize2.h"
 #include <algorithm>
 
-ImageLayout ImageLayout::computeImageLayout(const uint8_t* pixels, int imageWidth, int imageHeight, const Cli::TermSize& term, int reservedRows) {
+ImageLayout ImageLayout::computeImageLayout(const uint8_t* pixels, int imageWidth, int imageHeight, const Cli::TermSize& term, std::uint32_t reservedRows) {
     ImageLayout layout;
 
     if (term.rows == 0 || term.cols == 0 ||
@@ -11,14 +11,14 @@ ImageLayout ImageLayout::computeImageLayout(const uint8_t* pixels, int imageWidt
         return layout;
 
     // Размер одной ячейки в пикселях
-    const int cellWidth = static_cast<int>(term.pixelWidth)  / static_cast<int>(term.cols);
-    const int cellHeight = static_cast<int>(term.pixelHeight) / static_cast<int>(term.rows);
+    std::uint32_t cellWidth = term.pixelWidth  / term.cols;
+    std::uint32_t cellHeight = term.pixelHeight / term.rows;
 
     if (cellWidth == 0 || cellHeight == 0) return layout;
 
     // Доступная область с учётом зарезервированных строк UI
-    const int availablePixelWidth = static_cast<int>(term.pixelWidth);
-    const int availablePixelHeight = static_cast<int>(term.pixelHeight) - reservedRows * cellHeight;
+    std::uint32_t availablePixelWidth = term.pixelWidth;
+    std::uint32_t availablePixelHeight = term.pixelHeight - reservedRows * cellHeight;
 
     if (availablePixelWidth <= 0 || availablePixelHeight <= 0) return layout;
 
@@ -28,8 +28,8 @@ ImageLayout ImageLayout::computeImageLayout(const uint8_t* pixels, int imageWidt
         static_cast<float>(availablePixelHeight) / imageHeight
     );
 
-    layout.layoutWidth = static_cast<int>(imageWidth * scale);
-    layout.layoutHeight = static_cast<int>(imageHeight * scale);
+    layout.layoutWidth = static_cast<std::uint32_t>(imageWidth * scale);
+    layout.layoutHeight = static_cast<std::uint32_t>(imageHeight * scale);
 
     layout.resized.resize(layout.layoutWidth * layout.layoutHeight * 3);
     stbir_resize_uint8_linear(
@@ -40,14 +40,16 @@ ImageLayout ImageLayout::computeImageLayout(const uint8_t* pixels, int imageWidt
 
     // Центрирование в доступной области
     // +reserved_rows чтобы не заезжать под StatusBar
-    const int imageCols = (layout.layoutWidth + cellWidth - 1) / cellWidth;
-    const int imageRows = (layout.layoutHeight + cellHeight - 1) / cellHeight;
+    std::uint32_t imageCols = (layout.layoutWidth + cellWidth - 1) / cellWidth;
+    std::uint32_t imageRows = (layout.layoutHeight + cellHeight - 1) / cellHeight;
+    layout.imageCols = imageCols;
+    layout.imageRows = imageRows;
 
-    const int availableCols = static_cast<int>(term.cols);
-    const int availableRows = static_cast<int>(term.rows) - reservedRows;
+    std::uint32_t availableCols = term.cols;
+    std::uint32_t availableRows = term.rows - reservedRows;
 
-    layout.x = std::max(0, (availableCols - imageCols) / 2);
-    layout.y = std::max(0, (availableRows - imageRows) / 2) + reservedRows;
+    layout.x = std::max(0, (static_cast<int>(availableCols) - static_cast<int>(imageCols)) / 2);
+    layout.y = std::max(0, (static_cast<int>(availableRows) - static_cast<int>(imageRows)) / 2) + reservedRows;
 
     return layout;
 }

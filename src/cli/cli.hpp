@@ -29,6 +29,7 @@ namespace Key {
 enum class InputEventType {
     Key,
     Resize,
+    Timeout,
 };
 
 struct InputEvent {
@@ -42,59 +43,37 @@ struct InputEvent {
     static InputEvent resizeEvent() {
         return {InputEventType::Resize, 0};
     }
+
+    static InputEvent timeoutEvent() {
+        return {InputEventType::Timeout, 0};
+    }
 };
 
 class Terminal final {
 public:
-    Terminal();
+    explicit Terminal();
 
     ~Terminal() {
-        showCursor();
         teardownSigwinch();
         disableRawMode();
-        write(STDOUT_FILENO, "\033[?1049l", 8);
     }
 
-    InputEvent readEvent() const;
+    InputEvent readEvent(int timeoutMs = -1) const;
     int readKey() const;
 
-    // TODO cli не знает о draw
-    void drawAt(unsigned int col, unsigned int row, const std::string& text) const {
-        std::string cmd = "\033[" + std::to_string(row) + ";"
-                        + std::to_string(col) + "H" + text;
-        write(STDOUT_FILENO, cmd.c_str(), cmd.size());
-    }
-    /*completely clear the window */
-    void clear()       { write(STDOUT_FILENO, "\033[2J\033[H", 8); }
-    /*clear the window at certain coordinates */
-    void clearAt(unsigned int col, unsigned int row, unsigned int width,  unsigned int height) const;
-    void hideCursor() const { write(STDOUT_FILENO, "\033[?25l", 6); }
-    void showCursor() const { write(STDOUT_FILENO, "\033[?25h", 6); }
-    // TODO
-
     /* refresh size terminal */
-    void refreshSize() {
-        size = queryTermSize();
-        centerRow = (size.rows / 2) + 1;
-        centerCol = (size.cols / 2) + 1;
-    }
+    void refreshSize();
     /* return current terminal size */
     [[nodiscard]] TermSize getTerminalSize() const { return size; }
 
 private:
     /* requests the size of the terminal, for ex when changing the size */
-    static TermSize queryTermSize() {
-        struct winsize w;
-        ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-        return { w.ws_col, w.ws_row, w.ws_ypixel, w.ws_xpixel };
-    }
+    static TermSize queryTermSize();
     /* enable the raw terminal mode */
     void enableRawMode();
 
     /* disable the raw mode, in destructor */
-    void disableRawMode() {
-        tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios);
-    }
+    void disableRawMode();
 
     /* terminal size, pixel height/width */
     TermSize size{};
@@ -102,7 +81,6 @@ private:
     std::uint32_t centerRow = 0;
     /* default terminal settings */
     struct termios oldTermios{};
-
 
     int sigPipe[2] = {-1, -1};  // [0] = read end, [1] = write end
     static std::atomic<int> winchPipeWriteFd;  // для signal handler

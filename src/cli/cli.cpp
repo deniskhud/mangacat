@@ -9,12 +9,9 @@ std::atomic<int> Cli::Terminal::winchPipeWriteFd{-1};
 
 
 Cli::Terminal::Terminal() {
-    write(STDOUT_FILENO, "\033[?1049h", 8);
-
     enableRawMode();
     setupSigwinch();
     refreshSize();
-    hideCursor();
 }
 
 void Cli::Terminal::sigwinchHandler(int) {
@@ -58,7 +55,11 @@ void Cli::Terminal::enableRawMode() {
     tcsetattr(STDIN_FILENO, TCSANOW, &raw);
 }
 
-Cli::InputEvent Cli::Terminal::readEvent() const {
+void Cli::Terminal::disableRawMode() {
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios);
+}
+
+Cli::InputEvent Cli::Terminal::readEvent(int timeoutMs) const {
     while (true) {
         pollfd fds[2] = {
             {STDIN_FILENO, POLLIN, 0},
@@ -66,7 +67,11 @@ Cli::InputEvent Cli::Terminal::readEvent() const {
         };
         const nfds_t fdCount = sigPipe[0] == -1 ? 1 : 2;
 
-        int result = poll(fds, fdCount, -1);
+        int result = poll(fds, fdCount, timeoutMs);
+        if (result == 0) {
+            return InputEvent::timeoutEvent();
+        }
+
         if (result == -1) {
             if (errno == EINTR) continue;
             return InputEvent::keyEvent(Key::esc);
@@ -150,13 +155,14 @@ void Cli::Terminal::drainResizePipe() const {
     while (read(sigPipe[0], buf, sizeof(buf)) > 0) {}
 }
 
-void Cli::Terminal::clearAt(unsigned int col, unsigned int row, unsigned int width, unsigned int height) const {
-    std::string spaces(width, ' ');
-    for (size_t y = 0; y < height; ++y) {
-        std::string cmd = "\033[" + std::to_string(row + y) + ";"
-                        + std::to_string(col) + "H";
+void Cli::Terminal::refreshSize() {
+    size = queryTermSize();
+    centerRow = (size.rows / 2) + 1;
+    centerCol = (size.cols / 2) + 1;
+}
 
-        write(STDOUT_FILENO, cmd.c_str(), cmd.size());
-        write(STDOUT_FILENO, spaces.c_str(), spaces.size());
-    }
+Cli::TermSize Cli::Terminal::queryTermSize() {
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    return { w.ws_col, w.ws_row, w.ws_ypixel, w.ws_xpixel };
 }

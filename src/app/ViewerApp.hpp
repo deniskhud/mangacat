@@ -37,6 +37,7 @@ private:
     Renderer::Renderer renderer;
 
     bool running = true;
+    bool waitingForCurrentImage = false;
 
     void handleEvent(const Cli::InputEvent& event);
     void handleKey(int key);

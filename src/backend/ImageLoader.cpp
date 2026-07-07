@@ -39,6 +39,7 @@ std::shared_ptr<ImageData> ImageLoader::load(const fs::path& path) const {
                 ",s=" + std::to_string(img->layout.layoutWidth) +
                 ",v=" + std::to_string(img->layout.layoutHeight) +
                 ",x=0,y=0"
+                ",C=1"
                 ",m=" + std::to_string(more) + ";";
         } else {
             chunk.prefix = "\033_Gm=" + std::to_string(more) + ";";

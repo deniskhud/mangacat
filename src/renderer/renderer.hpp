@@ -1,133 +1,81 @@
 #pragma once
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
-#include "../backend/backend.hpp"
 #include "../cli/cli.hpp"
 #include "../backend/ImageData.hpp"
 
-struct Pos {
-    uint16_t x;
-    uint16_t y;
-    uint16_t width;
-    uint16_t height;
-
-    Pos() : x(0), y(0),  width(0), height(0) {  }
-    Pos(uint16_t x, uint16_t y, uint16_t width, uint16_t height) :
-        x(x), y(y),  width(width), height(height) {
-
-    }
-};
-
 namespace Renderer {
-    class Image {
-    private:
-        int lastWidth = 0, lastHeight = 0;
-        int lastX = 0, lastY = 0;
-
-        bool needsClear(const ImageLayout& layout) const {
-            // Первый кадр — всегда clear
-            if (lastWidth == 0 && lastHeight == 0) return true;
-            // Новая картинка меньше — старые пиксели останутся по краям
-            return layout.layoutWidth < lastWidth || layout.layoutHeight < lastHeight;
-        }
-
-
-
-        Pos position{};
-        void setCursorCenter(const std::shared_ptr<ImageData>& img) {
-            std::string moveCommand = "\033[" + std::to_string(img->layout.y) + ";"
-                                   + std::to_string(img->layout.x) + "H";
-            /*std::string moveCommand = "\033[" + std::to_string(centerRow) + ";"
-                                   + std::to_string(centerCol) + "H";*/
-            write(STDOUT_FILENO, moveCommand.c_str(), moveCommand.length());
-        }
-        Cli::TermSize termSize;
-        const Cli::Terminal& terminal;
-        unsigned int centerCol = 0, centerRow = 0;
-    public:
-        Image(const Cli::Terminal& term);
-        void renderLoading();
-        void render(const std::shared_ptr<ImageData>& img);
-    };
-
+    /** main render class
+     * responsible for rendering the entire layer such as images, ui
+     */
     class Renderer {
+    public:
+        explicit Renderer(const Cli::TermSize& termSize);
+        ~Renderer();
+
+        void resize(const Cli::TermSize& size);
+        void beginFrame();
+        void endFrame();
+        void clearBuffer();
+        void clearScreen();
+
+        void drawImage(const std::shared_ptr<ImageData>& image);
+        void drawLoading();
+        void drawStatus(std::size_t current, std::size_t total);
+        void drawText(std::uint32_t x, std::uint32_t y, std::string_view text);
+        void drawRect(std::uint32_t x, std::uint32_t y, std::uint32_t width, std::uint32_t height);
+
     private:
         //buffer to render
-        std::vector<std::vector<char>> renderBuffer;
-        std::vector<std::vector<std::string>> charBuffer;
+        std::vector<std::string> renderBuffer;
         Cli::TermSize termSize;
-        Image imageEngine;
+        std::uint32_t lastImageX = 0;
+        std::uint32_t lastImageY = 0;
+        std::uint32_t lastImageWidth = 0;
+        std::uint32_t lastImageHeight = 0;
+        bool loadingVisible = false;
+        std::uint32_t loadingX = 0;
+        std::uint32_t loadingY = 0;
+        std::uint32_t loadingWidth = 0;
 
-        void setChar(unsigned int x, unsigned int y, char ch);
-    public:
-        void clearBuffer();
-        void clearImageBuffer();
-        void drawTopRightRect(int width, int height);
-        void drawRect(int x, int y, int w, int h);
-        Renderer(const Cli::Terminal& term) : imageEngine(term) {
-            termSize = term.getTerminalSize();
-            renderBuffer.resize(termSize.cols, std::vector<char>(termSize.rows));
-        }
+        /** set char in (x, y) coordinate
+         *
+         * @param x
+         * @param y
+         * @param ch
+         */
+        void setChar(std::uint32_t x, std::uint32_t y, char ch);
 
-        void render(const std::shared_ptr<ImageData>& data);
+        /** resize render buffer according to terminal size
+         *
+         * @param termSize
+         * @return std::vector<std::vector<char>> buffer
+         */
+        std::vector<std::string> resizeRenderBuffer(const Cli::TermSize& size);
 
+        void render();
+        void drawFrame();
+        void drawHLine(std::uint32_t x, std::uint32_t y, std::uint32_t width, char ch);
+        void drawVLine(std::uint32_t x, std::uint32_t y, std::uint32_t height, char ch);
+        void clearRegion(std::uint32_t x, std::uint32_t y, std::uint32_t width, std::uint32_t height);
+        void moveCursor(std::uint32_t x, std::uint32_t y);
+        void writeRaw(std::string_view data);
+        [[nodiscard]] std::uint32_t imageCellWidth(const ImageLayout& layout) const;
+        [[nodiscard]] std::uint32_t imageCellHeight(const ImageLayout& layout) const;
 
+        static void enterAltScreen();
+        static void leaveAltScreen();
+
+        void eraseImagesConflict(const std::uint32_t& currentX, const std::uint32_t& currentY, const std::uint32_t& currentWidth, const std::uint32_t& currentHeight);
+
+        /** hide cursor
+         */
+        static void hideCursor();
+        static void showCursor();
     };
-    struct RenderPos {
-        int x, y;
-    };
-
-    class IRenderer {
-    public:
-        virtual ~IRenderer() = default;
-        //virtual void show(const ImageData& img) = 0;
-        virtual void clear() = 0;
-    };
-
-
-
-
-    inline void drawSeparator(Cli::Terminal& term, const Cli::TermSize& size) {
-        unsigned int leftWidth = size.cols / 2;
-        for (unsigned int i = 1; i <= size.rows; ++i) {
-            term.drawAt(leftWidth, i, "│");
-        }
-    }
-    inline void drawHorizontalSeparator(Cli::Terminal& term, const Cli::TermSize& size) {
-
-    }
-
-
-    struct ColumnLayout {
-        unsigned int leftWidth;
-        unsigned int rightWidth;
-
-        ColumnLayout(const Cli::TermSize& size) {
-            leftWidth = size.cols / 2;
-            rightWidth = size.cols - leftWidth;
-        }
-
-
-    };
-    class Bar {
-    public:
-        unsigned int x, y, width;
-
-        Bar(unsigned int x, unsigned int y, unsigned int width) : x(x), y(y), width(width) {}
-
-        void render(Cli::Terminal& term, float progress) {
-            int filled = static_cast<int>(width * progress);
-            std::string bar = "[";
-            for (int i = 0; i < width; ++i) {
-                bar += (i < filled) ? "#" : " ";
-            }
-            bar += "]";
-
-            term.drawAt(x, y, bar);
-        }
-    };
-
 }

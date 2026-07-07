@@ -3,6 +3,10 @@
 
 namespace App {
 
+namespace {
+constexpr int imageLoadPollMs = 50;
+}
+
 ViewerApp::ViewerApp(const std::string& path)
     : terminal()
     , scanner(path)
@@ -10,7 +14,7 @@ ViewerApp::ViewerApp(const std::string& path)
     , loader(terminal.getTerminalSize())
     , loadWorker(cache, loader)
     , navigator(scanner.getPages(), cache, loader, loadWorker)
-    , renderer(terminal)
+    , renderer(terminal.getTerminalSize())
 {
     if (scanner.isEmpty())
         throw std::runtime_error("No images found in: " + path);
@@ -19,16 +23,15 @@ ViewerApp::ViewerApp(const std::string& path)
 
 
 void ViewerApp::run() {
-    terminal.clear();
+    renderer.clearScreen();
 
     renderCurrent();
 
     while (running) {
-        handleEvent(terminal.readEvent());
+        handleEvent(terminal.readEvent(waitingForCurrentImage ? imageLoadPollMs : -1));
     }
 
-    terminal.showCursor();
-    terminal.clear();
+    renderer.clearScreen();
 }
 
 
@@ -40,6 +43,11 @@ void ViewerApp::handleEvent(const Cli::InputEvent& event) {
             break;
         case Cli::InputEventType::Key:
             handleKey(event.key);
+            break;
+        case Cli::InputEventType::Timeout:
+            if (waitingForCurrentImage) {
+                renderCurrent();
+            }
             break;
     }
 }
@@ -79,25 +87,22 @@ void ViewerApp::handleKey(int key) {
 
 void ViewerApp::handleResize() {
     terminal.refreshSize();
+    renderer.resize(terminal.getTerminalSize());
 
     // TODO: пересчитать layout, когда renderer получит resize API.
-    terminal.clear();
+    renderer.clearScreen();
     renderCurrent();
 }
 
-
-
 void ViewerApp::renderCurrent() {
     auto img = navigator.current();
-    renderer.render(img);
+    waitingForCurrentImage = !img || !img->loaded;
+    renderer.beginFrame();
+    renderer.drawImage(img);
 
 
-    auto size = terminal.getTerminalSize();
-    std::string status =
-        std::to_string(navigator.currentIndex() + 1) + " / " +
-        std::to_string(navigator.total());
-
-    terminal.drawAt(1, size.rows, status);
+    renderer.drawStatus(navigator.currentIndex() + 1, navigator.total());
+    renderer.endFrame();
 }
 
 } // namespace App
