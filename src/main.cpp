@@ -1,5 +1,5 @@
 #include <iostream>
-#include "app/ViewerApp.hpp"
+#include "app/viewerApp.hpp"
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {

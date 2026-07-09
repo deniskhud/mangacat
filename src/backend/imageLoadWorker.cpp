@@ -1,4 +1,4 @@
-#include "ImageLoadWorker.hpp"
+#include "imageLoadWorker.hpp"
 
 #include <algorithm>
 #include <exception>

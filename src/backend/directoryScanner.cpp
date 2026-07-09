@@ -1,4 +1,4 @@
-#include "DirectoryScanner.hpp"
+#include "directoryScanner.hpp"
 
 void Backend::DirectoryScanner::changeDirectory(const fs::path& path) {
     if (!fs::exists(path) || !fs::is_directory(path))

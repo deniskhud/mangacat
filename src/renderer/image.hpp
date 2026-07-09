@@ -3,4 +3,4 @@
 #include <string>
 #include <vector>
 
-#include "../backend/ImageData.hpp"
+#include "../backend/imageData.hpp"

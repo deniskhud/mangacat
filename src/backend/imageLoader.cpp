@@ -1,4 +1,4 @@
-#include "ImageLoader.hpp"
+#include "imageLoader.hpp"
 #include "../stb_image.h"
 #include <algorithm>
 #include <iostream>

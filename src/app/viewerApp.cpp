@@ -1,4 +1,4 @@
-#include "ViewerApp.hpp"
+#include "viewerApp.hpp"
 #include <stdexcept>
 
 namespace App {

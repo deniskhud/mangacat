@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "../cli/cli.hpp"
-#include "../backend/ImageData.hpp"
+#include "../backend/imageData.hpp"
 
 namespace Renderer {
     /** main render class

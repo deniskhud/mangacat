@@ -4,7 +4,7 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
-#include "ImageData.hpp"
+#include "imageData.hpp"
 
 namespace fs = std::filesystem;
 

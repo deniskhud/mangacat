@@ -1,11 +1,11 @@
 #pragma once
 
 #include <string>
-#include "../backend/DirectoryScanner.hpp"
-#include "../backend/ImageCache.hpp"
-#include "../backend/ImageLoadWorker.hpp"
-#include "../backend/ImageLoader.hpp"
-#include "../backend/Navigator.hpp"
+#include "../backend/directoryScanner.hpp"
+#include "../backend/imageCache.hpp"
+#include "../backend/imageLoadWorker.hpp"
+#include "../backend/imageLoader.hpp"
+#include "../backend/navigator.hpp"
 #include "../cli/cli.hpp"
 #include "../renderer/renderer.hpp"
 

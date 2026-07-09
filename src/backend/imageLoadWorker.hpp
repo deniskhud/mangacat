@@ -11,8 +11,8 @@
 #include <unordered_set>
 #include <vector>
 
-#include "ImageCache.hpp"
-#include "ImageData.hpp"
+#include "imageCache.hpp"
+#include "imageData.hpp"
 
 namespace fs = std::filesystem;
 

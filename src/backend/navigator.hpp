@@ -6,9 +6,9 @@
 #include <memory>
 #include <utility>
 #include <vector>
-#include "ImageCache.hpp"
-#include "ImageData.hpp"
-#include "ImageLoadWorker.hpp"
+#include "imageCache.hpp"
+#include "imageData.hpp"
+#include "imageLoadWorker.hpp"
 
 namespace fs = std::filesystem;
 

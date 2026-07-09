@@ -1,4 +1,4 @@
-#include "ImageData.hpp"
+#include "imageData.hpp"
 #include "../cli/cli.hpp"
 #include "../stb_image_resize2.h"
 #include <algorithm>

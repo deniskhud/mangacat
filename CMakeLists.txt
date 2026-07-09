@@ -19,20 +19,21 @@ add_executable(cli_manga_reader src/main.cpp
         src/backend/backend.cpp
         src/renderer/image.cpp
         src/renderer/renderer.cpp
-        src/backend/ImageData.hpp
-        src/renderer/KittyRenderer.hpp
-        src/backend/ImageData.cpp
+        src/backend/imageData.hpp
+        src/renderer/kittyRenderer.hpp
+        src/backend/imageData.cpp
         src/stb.cpp
-        src/backend/ImageLoader.hpp
-        src/backend/ImageCache.hpp
-        src/backend/ImageLoadWorker.hpp
-        src/backend/ImageLoadWorker.cpp
-        src/backend/Navigator.hpp
-        src/backend/ImageLoader.cpp
-        src/backend/DirectoryScanner.hpp
-        src/app/ViewerApp.hpp
-        src/app/ViewerApp.cpp
-        src/backend/DirectoryScanner.cpp
+        src/backend/imageLoader.hpp
+        src/backend/imageCache.hpp
+        src/backend/imageLoadWorker.hpp
+        src/backend/imageLoadWorker.cpp
+        src/backend/navigator.hpp
+        src/backend/imageLoader.cpp
+        src/backend/directoryScanner.hpp
+        src/app/viewerApp.hpp
+        src/app/viewerApp.cpp
+        src/backend/directoryScanner.cpp
+        src/backend/directoryBrowser/directoryBrowser.hpp
 )
 
 target_include_directories(cli_manga_reader PRIVATE

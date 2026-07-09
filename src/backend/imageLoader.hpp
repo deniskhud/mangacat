@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
-#include "ImageData.hpp"
+#include "imageData.hpp"
 
 namespace fs = std::filesystem;
 
