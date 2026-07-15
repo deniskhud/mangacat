@@ -1,30 +1,34 @@
-#ifndef CLI_MANGA_READER_DIRECTORYBROWSER_HPP
-#define CLI_MANGA_READER_DIRECTORYBROWSER_HPP
 #pragma once
+
 #include <filesystem>
+#include <string>
 #include <vector>
-namespace fs =  std::filesystem;
+
+namespace Backend {
 
 struct DirectoryEntry {
-    fs::path path;
+    std::filesystem::path path;
     std::string name;
-    bool isDirectory;
-    bool containsImages;
+    bool isDirectory = false;
+    bool containsImages = false;
 };
 
 class DirectoryBrowser final {
 public:
-    explicit DirectoryBrowser();
+    DirectoryBrowser()
+        : currentPath(std::filesystem::current_path()) {}
 
-    const fs::path& getCurrentPath();
+    [[nodiscard]] const std::filesystem::path& getCurrentPath() const noexcept {
+        return currentPath;
+    }
 
-
-
+    [[nodiscard]] const std::vector<DirectoryEntry>& getEntries() const noexcept {
+        return entries;
+    }
 
 private:
-    fs::path currentPath;
+    std::filesystem::path currentPath;
     std::vector<DirectoryEntry> entries;
 };
 
-
-#endif //CLI_MANGA_READER_DIRECTORYBROWSER_HPP
+} // namespace Backend
